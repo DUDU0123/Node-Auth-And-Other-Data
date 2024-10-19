@@ -1,7 +1,8 @@
 // Importing necessary modules
 const userModel = require("../models/user"); // Importing the user model to interact with the database
 const bcrypt = require('bcrypt'); // Importing bcrypt for password hashing and comparison
-
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 // Function to handle user login
 async function handleLoginUser(req, res) {
     try {
@@ -17,13 +18,14 @@ async function handleLoginUser(req, res) {
         if (!existingUser || !(await bcrypt.compare(password, existingUser.password))) {
             return res.status(400).json({ msg: 'Invalid email or password' });
         }
+
+        const jwtToken = jwt.sign({ id: existingUser._id, email: existingUser.email }, JWT_SECRET, { expiresIn: '1h' });
+
         // If the credentials are valid, return the user's ID
-        return res.json({ id: existingUser._id });
+        return res.status(200).json({ token: jwtToken, user: { id: existingUser._id, email: existingUser.email } });
     } catch (error) {
-        // Log any errors for debugging purposes
-        console.log(error);
         // Return a 500 Internal Server Error response in case of an error
-        return res.status(500).json({ msg: 'Internal server error' });
+        return res.status(500).json({ msg: 'Internal server error', });
     }
 }
 
@@ -50,17 +52,17 @@ async function handleSignUpUser(req, res) {
             password: hashedPassword,
         });
         // If the user could not be created, return a generic error response
-        if (!createdUser) return res.status().json({ msg: 'Cannot create user' });
-        // If the user is created successfully, return a success message
-        return res.status(201).json({ msg: 'User created' });
+        if (!createdUser) return res.status(400).json({ msg: 'Cannot create user' });
+
+        // Generate JWT token
+        const jwtToken = jwt.sign({ id: createdUser._id, email: createdUser.email }, JWT_SECRET, { expiresIn: '1h' });
+
+        return res.status(201).json({ token: jwtToken, user: { id: createdUser._id, email: createdUser.email } });
     } catch (error) {
-        // Log any errors for debugging purposes
-        console.log(error);
         // Return a 500 Internal Server Error response in case of an error
         return res.status(500).json({ msg: 'Internal server error' });
     }
 }
-
 // Export the functions for use in other parts of the application
 module.exports = {
     handleSignUpUser: handleSignUpUser,
